@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Hub Ultimate</title>
+    <style>
+        :root { --neon-color: #00f2ff; --bg-color: #050505; }
+        body { 
+            background-color: var(--bg-color); display: flex; flex-direction: column; 
+            align-items: center; height: 100vh; margin: 0; 
+            font-family: 'Courier New', Courier, monospace; color: white; overflow: hidden; 
+        }
+        
+        /* Navigation */
+        .tabs { display: flex; gap: 5px; margin: 15px 0; z-index: 100; flex-wrap: wrap; justify-content: center; }
+        .tab-btn { 
+            background: #111; color: white; border: 2px solid #333; 
+            padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 12px;
+        }
+        .tab-btn.active { border-color: var(--neon-color); color: var(--neon-color); box-shadow: 0 0 10px var(--neon-color); }
+        
+        .section { display: none; flex-direction: column; align-items: center; width: 100%; }
+        .section.active { display: flex; }
+
+        /* Clock Face */
+        .clock { 
+            width: 65vmin; height: 65vmin; max-width: 320px; max-height: 320px;
+            border: 6px solid #1a1a1a; border-radius: 50%; position: relative; 
+            box-shadow: 0 0 40px #000; margin-bottom: 10px; background: #000;
+        }
+        .mark-container { position: absolute; width: 100%; height: 100%; display: flex; justify-content: center; }
+        .mark-line { width: 2px; height: 12px; background: #444; }
+        .mark-line.active { width: 4px; height: 18px; background: var(--neon-color); box-shadow: 0 0 8px var(--neon-color); }
+        .number { position: absolute; font-size: 1.2rem; font-weight: bold; transform: translate(-50%, -50%); text-shadow: 0 0-5px var(--neon-color); }
+        .hand { position: absolute; bottom: 50%; left: 50%; transform-origin: bottom; background: var(--neon-color); border-radius: 10px; transform: translateX(-50%); }
+        .sec { width: 2px; height: 40%; background: #ff0055; box-shadow: 0 0 8px #ff0055; }
+        .center-dot { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; background: white; border-radius: 50%; transform: translate(-50%, -50%); z-index: 10; }
+
+        /* Displays & Inputs */
+        .digital { font-size: 2.5rem; color: var(--neon-color); text-shadow: 0 0 10px var(--neon-color); font-weight: bold; margin: 10px 0; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { width: 65px; font-size: 1.8rem; text-align: center; background: #000; color: var(--neon-color); border: 2px solid #333; border-radius: 8px; }
+        
+        /* Buttons */
+        .btn-row { display: flex; gap: 10px; }
+        .action-btn { 
+            padding: 12px 25px; background: #111; color: white; 
+            border: 2px solid var(--neon-color); border-radius: 8px; 
+            font-weight: bold; cursor: pointer; text-transform: uppercase;
+        }
+        .stop-btn-red { border-color: #ff0055; color: #ff0055; }
+
+        /* Overlay */
+        #alarmOverlay { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(255, 0, 0, 0.9); z-index: 1000; 
+            flex-direction: column; justify-content: center; align-items: center; 
+            animation: flash 0.4s infinite; 
+        }
+        @keyframes flash { 0% { background: rgba(255,0,0,0.9); } 50% { background: rgba(100,0,0,0.9); } }
+    </style>
+</head>
+<body>
+
+    <div id="alarmOverlay">
+        <h1 style="font-size: 4rem; color: white; margin-bottom: 20px;">ALERT!</h1>
+        <button class="action-btn" style="background: white; color: black;" onclick="stopAlarm()">DISMISS</button>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('clock')">CLOCK</button>
+        <button class="tab-btn" onclick="switchTab('timer')">TIMER</button>
+        <button class="tab-btn" onclick="switchTab('stopwatch')">STOPWATCH</button>
+        <button class="tab-btn" onclick="switchTab('alarm')">ALARM</button>
+    </div>
+
+    <div id="clockSection" class="section active">
+        <div class="clock" id="clockFace">
+            <div class="center-dot"></div>
+            <div id="hour" class="hand" style="width:6px; height:25%;"></div>
+            <div id="min" class="hand" style="width:4px; height:35%;"></div>
+            <div id="sec" class="hand sec"></div>
+        </div>
+        <div class="digital" id="clockDigital">00:00:00</div>
+    </div>
+
+    <div id="timerSection" class="section">
+        <div id="timerInputs" class="input-group">
+            <input type="number" id="t-h" placeholder="HH">
+            <input type="number" id="t-m" placeholder="MM">
+            <input type="number" id="t-s" placeholder="SS">
+        </div>
+        <div class="digital" id="timerDisplay" style="display:none; font-size: 4rem;">00:00:00</div>
+        <div class="btn-row">
+            <button class="action-btn" id="timerStartBtn" onclick="startTimer()">Start</button>
+            <button class="action-btn" onclick="pauseTimer()">Pause</button>
+            <button class="action-btn stop-btn-red" onclick="resetTimer()">Stop</button>
+        </div>
+    </div>
+
+    <div id="stopwatchSection" class="section">
+        <div class="digital" id="swDisplay" style="font-size: 4.5rem;">00:00.00</div>
+        <div class="btn-row">
+            <button class="action-btn" id="swStartBtn" onclick="startStopwatch()">Start</button>
+            <button class="action-btn stop-btn-red" onclick="resetStopwatch()">Reset</button>
+        </div>
+    </div>
+
+    <div id="alarmSection" class="section">
+        <div class="input-group">
+            <input type="number" id="a-h" placeholder="HR" max="23">
+            <input type="number" id="a-m" placeholder="MIN" max="59">
+        </div>
+        <div id="alarmStatus" style="color: var(--neon-color); margin-bottom: 15px;">No Alarm Set</div>
+        <div class="btn-row">
+            <button class="action-btn" onclick="setAlarm()">Set Alarm</button>
+            <button class="action-btn stop-btn-red" onclick="cancelAlarm()">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        let timerInt, swInt, alarmLoop, audioCtx;
+        let tSecs = 0, swMs = 0, alarmTime = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function switchTab(s) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.section').forEach(sec => sec.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(s + 'Section').classList.add('active');
+        }
+
+        // --- CLOCK LOGIC ---
+        const face = document.getElementById('clockFace');
+        for (let i = 0; i < 12; i++) {
+            const container = document.createElement('div');
+            container.className = 'mark-container';
+            container.style.transform = `rotate(${i * 30}deg)`;
+            const line = document.createElement('div');
+            line.className = 'mark-line' + (i % 3 === 0 ? ' active' : '');
+            container.appendChild(line);
+            face.appendChild(container);
+
+            const num = document.createElement('div');
+            num.className = 'number'; num.innerText = i === 0 ? 12 : i;
+            const angle = (i * 30 - 90) * (Math.PI / 180);
+            num.style.left = (50 + 38 * Math.cos(angle)) + '%';
+            num.style.top = (50 + 38 * Math.sin(angle)) + '%';
+            face.appendChild(num);
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const s = now.getSeconds(), m = now.getMinutes(), h = now.getHours();
+            document.getElementById('sec').style.transform = `translateX(-50%) rotate(${s * 6}deg)`;
+            document.getElementById('min').style.transform = `translateX(-50%) rotate(${m * 6}deg)`;
+            document.getElementById('hour').style.transform = `translateX(-50%) rotate(${(h % 12) * 30 + m * 0.5}deg)`;
+            document.getElementById('clockDigital').innerText = now.toLocaleTimeString();
+            
+            if(alarmTime && now.getHours() == alarmTime.h && now.getMinutes() == alarmTime.m && s == 0) triggerAlarm();
+        }
+        setInterval(updateClock, 1000);
+
+        // --- TIMER LOGIC ---
+        function startTimer() {
+            initAudio();
+            if (timerInt) return;
+            if (tSecs === 0) {
+                tSecs = (parseInt(document.getElementById('t-h').value || 0) * 3600) + 
+                        (parseInt(document.getElementById('t-m').value || 0) * 60) + 
+                        (parseInt(document.getElementById('t-s').value || 0));
+            }
+            if (tSecs <= 0) return;
+            document.getElementById('timerInputs').style.display = 'none';
+            document.getElementById('timerDisplay').style.display = 'block';
+            timerInt = setInterval(() => {
+                tSecs--;
+                let h = Math.floor(tSecs/3600), m = Math.floor((tSecs%3600)/60), s = tSecs%60;
+                document.getElementById('timerDisplay').innerText = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                if (tSecs <= 0) { clearInterval(timerInt); timerInt = null; triggerAlarm(); }
+            }, 1000);
+        }
+        function pauseTimer() { clearInterval(timerInt); timerInt = null; }
+        function resetTimer() { 
+            pauseTimer(); tSecs = 0; 
+            document.getElementById('timerInputs').style.display = 'flex';
+            document.getElementById('timerDisplay').style.display = 'none';
+        }
+
+        // --- STOPWATCH LOGIC ---
+        function startStopwatch() {
+            initAudio();
+            if (swInt) { clearInterval(swInt); swInt = null; document.getElementById('swStartBtn').innerText = 'Start'; }
+            else {
+                document.getElementById('swStartBtn').innerText = 'Pause';
+                swInt = setInterval(() => {
+                    swMs += 10;
+                    let ms = Math.floor((swMs % 1000) / 10), s = Math.floor((swMs / 1000) % 60), m = Math.floor(swMs / 60000);
+                    document.getElementById('swDisplay').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${ms.toString().padStart(2,'0')}`;
+                }, 10);
+            }
+        }
+        function resetStopwatch() { clearInterval(swInt); swInt = null; swMs = 0; document.getElementById('swDisplay').innerText = "00:00.00"; document.getElementById('swStartBtn').innerText = 'Start'; }
+
+        // --- ALARM LOGIC ---
+        function setAlarm() {
+            const h = document.getElementById('a-h').value;
+            const m = document.getElementById('a-m').value;
+            if (h === "" || m === "") return;
+            alarmTime = { h: parseInt(h), m: parseInt(m) };
+            document.getElementById('alarmStatus').innerText = `Alarm set for ${h.padStart(2,'0')}:${m.padStart(2,'0')}`;
+        }
+        function cancelAlarm() { alarmTime = null; document.getElementById('alarmStatus').innerText = "No Alarm Set"; }
+
+        // --- SOUND ENGINE ---
+        function triggerAlarm() {
+            document.getElementById('alarmOverlay').style.display = 'flex';
+            const beep = () => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square'; osc.frequency.setValueAtTime(1000, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            };
+            beep(); alarmLoop = setInterval(beep, 600);
+        }
+        function stopAlarm() { clearInterval(alarmLoop); document.getElementById('alarmOverlay').style.display = 'none'; resetTimer(); }
+    </script>
+</body>
+</html>
